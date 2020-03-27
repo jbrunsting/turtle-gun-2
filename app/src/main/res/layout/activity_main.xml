@@ -10,12 +10,24 @@
     tools:context=".MainActivity">
 
     <ImageView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:id="@+id/background1"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:padding="0dp"
-        android:rotation="-90"
-        android:scaleX="1.8"
-        android:scaleY="1.8"
+        android:layout_margin="0dp"
+        android:scaleType="fitXY"
+        android:adjustViewBounds="true"
+        app:srcCompat="@drawable/background" />
+
+    <ImageView
+        android:id="@+id/background2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="0dp"
+        android:layout_margin="0dp"
+        android:scaleType="fitXY"
+        android:adjustViewBounds="true"
+        android:scaleY="-1"
         app:srcCompat="@drawable/background" />
 
     <ImageView
@@ -24,8 +36,6 @@
         android:layout_height="100dp"
         android:padding="0dp"
         android:rotation="-90"
-        android:scaleX="1"
-        android:scaleY="1"
         app:srcCompat="@drawable/turtle" />
 
     <ImageView

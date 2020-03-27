@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.opengl.Visibility
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -20,13 +21,14 @@ const val PIRANHA_SPEED: Float = 1200.0f
 const val TURTLE_SIDE_MARGIN: Float = 100.0f
 const val TURTLE_START_DISTANCE: Float = 700.0f
 const val PIRANHA_SIZE = 100.0f
+const val OBJECT_SPEED: Float = 800.0f
 const val X = 0
 const val Y = 1
 
 open class Entity(v: View, minx: Float, miny: Float, maxx: Float, maxy: Float) {
     var v = v
-    var min: FloatArray = floatArrayOf(minx, miny)
-    var max: FloatArray = floatArrayOf(maxx, maxy)
+    var min = floatArrayOf(minx, miny)
+    var max = floatArrayOf(maxx, maxy)
 
     fun getCenterCoord(dim: Int): Float {
         if (dim == X) {
@@ -46,6 +48,8 @@ open class Entity(v: View, minx: Float, miny: Float, maxx: Float, maxy: Float) {
     }
 }
 
+enum class WrapType { REVERSE, WRAP, HIDE }
+
 class AnimatedEntity(
     v: View,
     stepx: Float,
@@ -53,20 +57,34 @@ class AnimatedEntity(
     minx: Float,
     miny: Float,
     maxx: Float,
-    maxy: Float
+    maxy: Float,
+    type: WrapType
 ) : Entity(v, minx, miny, maxx, maxy) {
-    var step: FloatArray = floatArrayOf(stepx, stepy)
-    var dir: IntArray = intArrayOf(1, 1)
+    var step = floatArrayOf(stepx, stepy)
+    var dir = intArrayOf(1, 1)
+    var type = type
 
     fun step() {
         for (dim in 0..1) {
             setCenterCoord(dim, getCenterCoord(dim) + this.step[dim] * this.dir[dim])
             if (getCenterCoord(dim) < this.min[dim]) {
-                setCenterCoord(dim, this.min[dim])
-                this.dir[dim] *= -1;
+                if (type == WrapType.REVERSE) {
+                    setCenterCoord(dim, this.min[dim])
+                    this.dir[dim] *= -1;
+                } else if (type == WrapType.WRAP) {
+                    setCenterCoord(dim, this.max[dim])
+                } else if (type == WrapType.HIDE) {
+                    v.visibility = View.GONE
+                }
             } else if (getCenterCoord(dim) > this.max[dim]) {
-                setCenterCoord(dim, this.max[dim])
-                this.dir[dim] *= -1;
+                if (type == WrapType.REVERSE) {
+                    setCenterCoord(dim, this.max[dim])
+                    this.dir[dim] *= -1;
+                } else if (type == WrapType.WRAP) {
+                    setCenterCoord(dim, this.min[dim])
+                } else if (type == WrapType.HIDE) {
+                    v.visibility = View.GONE
+                }
             }
         }
     }
@@ -77,11 +95,17 @@ class MainActivity : AppCompatActivity() {
     var sHeight: Float = 0.0f
     var narwhalEntity: AnimatedEntity? = null
     var turtleEntity: Entity? = null
-    var piranhaEntity: AnimatedEntity? = null
+    var piranhaEntities: List<AnimatedEntity> = listOf()
+    var background1Entity: AnimatedEntity? = null
+    var background2Entity: AnimatedEntity? = null
 
     private fun frame() {
         narwhalEntity?.step()
-        piranhaEntity?.step()
+        for (p in piranhaEntities) {
+            p.step()
+        }
+        background1Entity?.step()
+        background2Entity?.step()
     }
 
     private fun shootPiranha() {
@@ -98,15 +122,16 @@ class MainActivity : AppCompatActivity() {
         piranhaView.x = 0.0f;
         piranhaView.y = 0.0f;
 
-        piranhaEntity = AnimatedEntity(
+        piranhaEntities += AnimatedEntity(
             piranhaView,
-            0.0f, //10.0f,
+            0.0f,
             -PIRANHA_SPEED / FPS,
             0.0f,
             0.0f,
             sWidth,
-            sHeight
-        );
+            sHeight,
+            WrapType.HIDE
+        )
 
         for (dim in 0..1) {
             piranhaView.x = (turtleEntity?.getCenterCoord(X) ?: 0.0f) - PIRANHA_SIZE / 2.0f
@@ -125,6 +150,35 @@ class MainActivity : AppCompatActivity() {
         sWidth = displayMetrics.widthPixels.toFloat()
         sHeight = displayMetrics.heightPixels.toFloat()
 
+        background1.post {
+            val bgCenterY = background1.height.toFloat() / 2.0f - 5.0f
+            val bgCenterX = background1.width.toFloat() / 2.0f
+
+            background1Entity = AnimatedEntity(
+                background1,
+                0.0f,
+                OBJECT_SPEED / FPS,
+                bgCenterX,
+                -bgCenterY,
+                bgCenterX,
+                3 * bgCenterY,
+                WrapType.WRAP
+            )
+            background1Entity?.setCenterCoord(Y, -bgCenterY)
+
+            background2Entity = AnimatedEntity(
+                background2,
+                0.0f,
+                OBJECT_SPEED / FPS,
+                bgCenterX,
+                -bgCenterY,
+                bgCenterX,
+                3 * bgCenterY,
+                WrapType.WRAP
+            )
+            background2Entity?.setCenterCoord(Y, bgCenterY)
+        }
+
         narwhal.post(Runnable {
             narwhal.x = sWidth / 2.0f
             narwhal.y = sHeight - narwhal.height - NARWHAL_BOTTOM_MARGIN
@@ -137,8 +191,9 @@ class MainActivity : AppCompatActivity() {
                 NARWHAL_SIDE_MARGIN.toFloat(),
                 narwhalY,
                 sWidth - NARWHAL_SIDE_MARGIN.toFloat(),
-                narwhalY
-            );
+                narwhalY,
+                WrapType.REVERSE
+            )
         })
 
         turtle.post(Runnable {
