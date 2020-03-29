@@ -15,13 +15,16 @@ import kotlinx.android.synthetic.main.activity_main.*
 
 const val FPS: Float = 60.0f
 const val NARWHAL_SPEED: Float = 1000.0f
-const val NARWHAL_SIDE_MARGIN: Float = 100.0f
+const val NARWHAL_SIDE_MARGIN: Float = 150.0f
 const val NARWHAL_BOTTOM_MARGIN: Float = 150.0f
 const val PIRANHA_SPEED: Float = 1200.0f
-const val TURTLE_SIDE_MARGIN: Float = 100.0f
+const val TURTLE_SIDE_MARGIN: Float = 250.0f
 const val TURTLE_START_DISTANCE: Float = 700.0f
-const val PIRANHA_SIZE = 100.0f
-const val OBJECT_SPEED: Float = 800.0f
+const val PIRANHA_SIZE = 100
+const val OBSTACLE_SIZE = 200
+const val OBSTACLE_MARGIN: Float = 150.0f
+const val WATER_SPEED: Float = 800.0f
+const val OBSTACLE_DELAY = 1000
 const val X = 0
 const val Y = 1
 
@@ -50,7 +53,7 @@ open class Entity(v: View, minx: Float, miny: Float, maxx: Float, maxy: Float) {
 
 enum class WrapType { REVERSE, WRAP, HIDE }
 
-class AnimatedEntity(
+open class AnimatedEntity(
     v: View,
     stepx: Float,
     stepy: Float,
@@ -90,6 +93,40 @@ class AnimatedEntity(
     }
 }
 
+class ObstacleEntity(
+    imagev: ImageView,
+    stepx: Float,
+    stepy: Float,
+    minx: Float,
+    miny: Float,
+    maxx: Float,
+    maxy: Float,
+    type: WrapType
+) : AnimatedEntity(imagev, stepx, stepy, minx, miny, maxx, maxy, type) {
+    val imagev = imagev
+    var destroyed = false
+
+    fun setImage() {
+        val resource = when ((Math.random() * 3).toInt()) {
+            0 -> R.drawable.obstacle_1
+            1 -> R.drawable.obstacle_2
+            else -> R.drawable.obstacle_3
+        }
+        imagev.setImageResource(resource)
+    }
+
+    fun destroy() {
+        destroyed = true
+        val resource = when ((Math.random() * 4).toInt()) {
+            0 -> R.drawable.blood_1
+            1 -> R.drawable.blood_2
+            2 -> R.drawable.blood_3
+            else -> R.drawable.blood_4
+        }
+        imagev.setImageResource(resource)
+    }
+}
+
 class MainActivity : AppCompatActivity() {
     var sWidth: Float = 0.0f
     var sHeight: Float = 0.0f
@@ -98,10 +135,14 @@ class MainActivity : AppCompatActivity() {
     var piranhaEntities: List<AnimatedEntity> = listOf()
     var background1Entity: AnimatedEntity? = null
     var background2Entity: AnimatedEntity? = null
+    var obstacleEntities: List<AnimatedEntity> = listOf()
 
     private fun frame() {
         narwhalEntity?.step()
         for (p in piranhaEntities) {
+            p.step()
+        }
+        for (p in obstacleEntities) {
             p.step()
         }
         background1Entity?.step()
@@ -115,7 +156,7 @@ class MainActivity : AppCompatActivity() {
 
         val piranhaView = ImageView(this)
         piranhaView.setImageResource(R.drawable.piranha)
-        val layoutParams = FrameLayout.LayoutParams(100, 100)
+        val layoutParams = FrameLayout.LayoutParams(PIRANHA_SIZE, PIRANHA_SIZE)
         main_layout.addView(piranhaView, layoutParams)
         piranhaView.rotation = -90.0f
         piranhaView.bringToFront()
@@ -127,9 +168,9 @@ class MainActivity : AppCompatActivity() {
             0.0f,
             -PIRANHA_SPEED / FPS,
             0.0f,
-            0.0f,
+            0.0f - PIRANHA_SIZE,
             sWidth,
-            sHeight,
+            sHeight + PIRANHA_SIZE,
             WrapType.HIDE
         )
 
@@ -137,6 +178,37 @@ class MainActivity : AppCompatActivity() {
             piranhaView.x = (turtleEntity?.getCenterCoord(X) ?: 0.0f) - PIRANHA_SIZE / 2.0f
             piranhaView.y = (turtleEntity?.getCenterCoord(Y) ?: 0.0f) - PIRANHA_SIZE / 2.0f
         }
+    }
+
+    private fun addObstacle() {
+        if (turtleEntity == null) {
+            return;
+        }
+
+        val obstacleView = ImageView(this)
+        val layoutParams = FrameLayout.LayoutParams(OBSTACLE_SIZE, OBSTACLE_SIZE)
+        main_layout.addView(obstacleView, layoutParams)
+
+        obstacleView.rotation = -90.0f
+        obstacleView.bringToFront()
+        obstacleView.x =
+            ((sWidth - 2 * OBSTACLE_MARGIN) * Math.random() + OBSTACLE_MARGIN).toFloat();
+        obstacleView.y = -OBSTACLE_SIZE.toFloat()
+
+        val obstacleEntity = ObstacleEntity(
+            obstacleView,
+            0.0f,
+            WATER_SPEED / FPS,
+            0.0f,
+            0.0f - OBSTACLE_SIZE,
+            sWidth,
+            sHeight + OBSTACLE_SIZE,
+            WrapType.HIDE
+        )
+
+        obstacleEntity.setImage()
+
+        obstacleEntities += obstacleEntity
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,7 +229,7 @@ class MainActivity : AppCompatActivity() {
             background1Entity = AnimatedEntity(
                 background1,
                 0.0f,
-                OBJECT_SPEED / FPS,
+                WATER_SPEED / FPS,
                 bgCenterX,
                 -bgCenterY,
                 bgCenterX,
@@ -169,7 +241,7 @@ class MainActivity : AppCompatActivity() {
             background2Entity = AnimatedEntity(
                 background2,
                 0.0f,
-                OBJECT_SPEED / FPS,
+                WATER_SPEED / FPS,
                 bgCenterX,
                 -bgCenterY,
                 bgCenterX,
@@ -207,6 +279,16 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 frame()
                 mainHandler.postDelayed(this, (1000 / FPS).toLong())
+            }
+        })
+
+        mainHandler.post(object : Runnable {
+            override fun run() {
+                addObstacle()
+                mainHandler.postDelayed(
+                    this,
+                    ((OBSTACLE_DELAY / 2) * Math.random() + OBSTACLE_DELAY / 2).toLong()
+                )
             }
         })
 
